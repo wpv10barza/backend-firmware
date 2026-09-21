@@ -1,0 +1,84 @@
+name: T-030 consolidated CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: t030-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - run: npm ci
+      - run: node -e "JSON.parse(require('fs').readFileSync('contract/device-command-v1.json','utf8'))"
+      - run: npm run lint
+      - run: npm test
+      - run: npm run build
+
+  firmware:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: firmware
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install PlatformIO
+        run: pip install platformio==6.2.0
+      - name: Native command-buffer test
+        run: |
+          set -euo pipefail
+          mkdir -p .ci/bin
+          g++ -std=c++17 -Wall -Wextra -Werror -Iinclude             tests/test_command_buffer_native.cpp             -o .ci/bin/command_buffer_native
+          .ci/bin/command_buffer_native
+      - name: Native viewport test
+        run: |
+          set -euo pipefail
+          mkdir -p .ci/bin
+          g++ -std=c++17 -Wall -Wextra -Werror -Iinclude             test/command_text_viewport_test.cpp             -o .ci/bin/command_text_viewport_test
+          .ci/bin/command_text_viewport_test
+      - name: Native keyboard hit-test
+        run: |
+          set -euo pipefail
+          mkdir -p .ci/bin
+          g++ -std=c++17 -Wall -Wextra -Werror -Iinclude             test/virtual_keyboard_hit_test.cpp             -o .ci/bin/virtual_keyboard_hit_test
+          .ci/bin/virtual_keyboard_hit_test
+      - name: Python regression tests
+        run: |
+          python test/command_buffer_regression.py
+          python tests/test_command_editor_integration.py
+          python tests/test_panel_state_contract.py
+          python tests/test_wifi_source.py
+      - name: Compile ESP32-S3-4848S040
+        run: pio run --environment panel_4848s040
+      - name: Verify static site
+        run: |
+          test -s site/index.html
+          grep -q 'ESP32-S3-4848S040' site/index.html
+
+  contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compare consolidated contracts
+        run: cmp firmware/contract/device-command-v1.json backend/contract/device-command-v1.json

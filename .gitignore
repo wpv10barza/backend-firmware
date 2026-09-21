@@ -1,0 +1,30 @@
+# Node / backend
+**/node_modules/
+**/dist/
+**/.env
+**/.env.*
+!**/.env.example
+
+# Local Firebase / Google app configuration
+**/firebase-applet-config.json
+**/service-account.json
+
+# Firmware / PlatformIO
+**/.pio/
+**/.vscode/
+**/include/local_config.h
+*.bin
+*.elf
+*.map
+
+# Secrets / credentials
+credentials/
+*.pem
+*.key
+
+# Runtime / local state
+**/state/
+**/venv/
+**/__pycache__/
+*.pyc
+.DS_Store
